@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Instruction Cycle Simulator – Editable Program & Memory</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56,189,248,0.1);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --danger: #f97373;
+      --success: #4ade80;
+      --border: #1f2937;
+      --mono: "Fira Code", "Consolas", monospace;
+      --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 1.5rem;
+      font-family: var(--sans);
+      background: radial-gradient(circle at top, #1f2937 0, #020617 45%, #000 100%);
+      color: var(--text);
+    }
+    h1, h2, h3 { margin: 0 0 .5rem; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.2rem; }
+    h3 { font-size: 1rem; color: var(--muted); }
+
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 2fr 1.5fr;
+      gap: 1rem;
+    }
+    .card {
+      background: linear-gradient(145deg, #020617, #020617 40%, #020617 60%, #020617);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 1rem 1.2rem;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.6);
+    }
+    .card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: .5rem;
+    }
+    .badge {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: .15rem .5rem;
+      border-radius: 999px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+    textarea, input {
+      width: 100%;
+      background: #020617;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: .4rem .6rem;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: .85rem;
+      resize: vertical;
+    }
+    textarea:focus, input:focus {
+      outline: 1px solid var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-soft);
+    }
+    label {
+      display: block;
+      font-size: .8rem;
+      color: var(--muted);
+      margin-bottom: .2rem;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      margin-top: .4rem;
+    }
+    button {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: .35rem .8rem;
+      background: #020617;
+      color: var(--text);
+      font-size: .8rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+      transition: background .15s, transform .05s, border-color .15s;
+    }
+    button.primary {
+      background: linear-gradient(120deg, #0ea5e9, #22c55e);
+      border-color: transparent;
+      color: #0b1120;
+      font-weight: 600;
+    }
+    button.danger {
+      border-color: rgba(248,113,113,0.8);
+      color: #fecaca;
+    }
+    button:disabled {
+      opacity: .4;
+      cursor: default;
+    }
+    button:not(:disabled):hover {
+      transform: translateY(-1px);
+      background: #020824;
+      border-color: var(--accent-soft);
+    }
+    button.primary:not(:disabled):hover {
+      background: linear-gradient(120deg, #38bdf8, #4ade80);
+    }
+    .pill {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: .2rem .55rem;
+      font-size: .7rem;
+      font-family: var(--mono);
+      color: var(--muted);
+      background: rgba(15,23,42,0.9);
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+    }
+    .pill span {
+      color: var(--accent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .78rem;
+      margin-top: .3rem;
+      font-family: var(--mono);
+    }
+    th, td {
+      border-bottom: 1px solid #111827;
+      padding: .15rem .2rem;
+      text-align: left;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 500;
+      background: rgba(15,23,42,.8);
+      position: sticky;
+      top: 0;
+    }
+    tr.highlight {
+      background: rgba(56,189,248,0.15);
+    }
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .25rem;
+      margin-top: .3rem;
+    }
+    .state-item {
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: .2rem .35rem;
+      font-size: .78rem;
+      background: rgba(15,23,42,.9);
+      display: flex;
+      flex-direction: column;
+      gap: .05rem;
+    }
+    .state-label {
+      color: var(--muted);
+      font-size: .7rem;
+    }
+    .state-value {
+      font-family: var(--mono);
+    }
+    .state-value.code {
+      color: #fbbf24;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .phase-indicator {
+      display: flex;
+      gap: .3rem;
+      margin-top: .2rem;
+      font-size: .75rem;
+    }
+    .phase-chip {
+      padding: .15rem .6rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .phase-chip.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .explanation {
+      font-size: .8rem;
+      background: radial-gradient(circle at top left, rgba(56,189,248,.15), transparent 55%);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: .5rem .6rem;
+      margin-top: .4rem;
+      min-height: 3.2rem;
+      white-space: pre-line;
+    }
+
+    .note {
+      font-size: .75rem;
+      color: var(--muted);
+      margin-top: .2rem;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Instruction Cycle Simulator</h1>
+  <p style="color:#9ca3af; font-size:0.85rem; max-width: 900px;">
+    This applet simulates the <b>Fetch &rarr; Decode &rarr; Execute</b> cycle for a simple CPU.
+    You can edit the <b>instruction sequence</b> and <b>memory contents</b>, then step through execution.
+  </p>
+
+  <div class="app">
+
+    <!-- LEFT: Editors & config -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Program &amp; Memory Setup</h2>
+          <h3>Editable instruction sequence and memory</h3>
+        </div>
+        <span class="badge">Section 1.2 · Example</span>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <label for="programInput">Instruction memory</label>
+          <textarea id="programInput" rows="10" spellcheck="false">
+100: LOAD R1, 500
+101: LOAD R2, 501
+102: ADD R3, R1, R2
+</textarea>
+          <div class="note">
+            Format: <code>address: OPCODE operands</code><br />
+            Supported opcodes: <code>LOAD</code>, <code>ADD</code>, <code>STORE</code>, <code>JUMP</code><br/>
+            Example: <code>100: LOAD R1, 500</code>
+          </div>
+        </div>
+        <div>
+          <label for="memoryInput">Main memory</label>
+          <textarea id="memoryInput" rows="10" spellcheck="false">
+100: LOAD R1, 500
+101: LOAD R2, 501
+102: ADD R3, R1, R2
+500: 12
+501: 20
+</textarea>
+          <div class="note">
+            Format: <code>address: value</code> or for instruction memory, the full line is stored as text.<br/>
+            Data values are treated as integers.
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="applyConfigBtn" class="primary">Apply / Reset CPU</button>
+        <button id="resetBtn" class="danger">Reset (keep text)</button>
+        <span class="pill">
+          PC start at <span id="pcStartLabel">100</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- RIGHT: CPU state & stepping -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>CPU State &amp; Execution</h2>
+          <h3>Step through fetch–decode–execute</h3>
+        </div>
+        <span class="badge">Interactive</span>
+      </div>
+
+      <div class="phase-indicator">
+        <div class="phase-chip" data-phase-chip="fetch">Fetch</div>
+        <div class="phase-chip" data-phase-chip="decode">Decode</div>
+        <div class="phase-chip" data-phase-chip="execute">Execute</div>
+      </div>
+
+      <div class="state-grid">
+        <div class="state-item">
+          <div class="state-label">PC (Program Counter)</div>
+          <div id="pcVal" class="state-value">–</div>
+        </div>
+        <div class="state-item">
+          <div class="state-label">IR (Instruction Register)</div>
+          <div id="irVal" class="state-value code">–</div>
+        </div>
+        <div class="state-item">
+          <div class="state-label">R1</div>
+          <div id="r1Val" class="state-value">0</div>
+        </div>
+        <div class="state-item">
+          <div class="state-label">R2</div>
+          <div id="r2Val" class="state-value">0</div>
+        </div>
+        <div class="state-item">
+          <div class="state-label">R3</div>
+          <div id="r3Val" class="state-value">0</div>
+        </div>
+        <div class="state-item">
+          <div class="state-label">Last ALU op</div>
+          <div id="aluVal" class="state-value code">–</div>
+        </div>
+        <div class="state-item">
+          <div class="state-label">Current phase</div>
+          <div id="phaseVal" class="state-value">–</div>
+        </div>
+        <div class="state-item">
+          <div class="state-label">Status</div>
+          <div id="statusVal" class="state-value">Ready</div>
+        </div>
+      </div>
+
+      <div class="controls" style="margin-top:.6rem;">
+        <button id="stepPhaseBtn">Step Phase (F→D→E)</button>
+        <button id="stepInstructionBtn">Step Full Instruction</button>
+        <button id="runBtn">Run Until End</button>
+      </div>
+
+      <div class="explanation" id="explanationBox">
+        Click <b>Apply / Reset CPU</b> to parse the program and memory,
+        then use <b>Step Phase</b> to walk through Fetch → Decode → Execute.
+      </div>
+    </div>
+
+    <!-- BOTTOM: visual memory + program view -->
+    <div class="card" style="grid-column: 1 / -1;">
+      <div class="card-header">
+        <div>
+          <h2>Visual Memory &amp; Program View</h2>
+          <h3>See where PC is pointing and how data changes</h3>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label>Instruction memory (parsed)</label>
+          <div style="max-height: 220px; overflow:auto; border-radius:8px; border:1px solid var(--border); margin-top:.2rem;">
+            <table id="programTable">
+              <thead>
+                <tr><th>Addr</th><th>Instruction</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <label>Data / combined memory</label>
+          <div style="max-height: 220px; overflow:auto; border-radius:8px; border:1px solid var(--border); margin-top:.2rem;">
+            <table id="memoryTable">
+              <thead>
+                <tr><th>Addr</th><th>Content</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <b>Note:</b> By design, this is a <i>simple teaching simulator</i>: addresses are integers,
+        and PC increments by 1 after each non-branch instruction. <code>JUMP addr</code> sets PC directly.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- State model ---
+    const state = {
+      program: [],       // { addr, text, op, args[] }
+      memory: {},        // addr -> either number or string (if instruction text)
+      registers: { PC: null, IR: "", R1: 0, R2: 0, R3: 0 },
+      lastALU: "",
+      phase: "fetch",    // "fetch" | "decode" | "execute"
+      halted: false,
+    };
+
+    const programInput = document.getElementById("programInput");
+    const memoryInput  = document.getElementById("memoryInput");
+    const applyConfigBtn = document.getElementById("applyConfigBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const pcStartLabel = document.getElementById("pcStartLabel");
+
+    const pcVal = document.getElementById("pcVal");
+    const irVal = document.getElementById("irVal");
+    const r1Val = document.getElementById("r1Val");
+    const r2Val = document.getElementById("r2Val");
+    const r3Val = document.getElementById("r3Val");
+    const aluVal = document.getElementById("aluVal");
+    const phaseVal = document.getElementById("phaseVal");
+    const statusVal = document.getElementById("statusVal");
+    const explanationBox = document.getElementById("explanationBox");
+
+    const programTableBody = document.querySelector("#programTable tbody");
+    const memoryTableBody  = document.querySelector("#memoryTable tbody");
+
+    const stepPhaseBtn = document.getElementById("stepPhaseBtn");
+    const stepInstructionBtn = document.getElementById("stepInstructionBtn");
+    const runBtn = document.getElementById("runBtn");
+
+    const phaseChips = document.querySelectorAll("[data-phase-chip]");
+
+    // --- Helpers ---
+    function parseIntOrNull(str) {
+      const n = parseInt(str, 10);
+      return Number.isNaN(n) ? null : n;
+    }
+
+    function parseProgramText(text) {
+      const lines = text.split("\n");
+      const program = [];
+
+      for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+        // expected "addr: INSTR..."
+        let addr = null;
+        let rest = line;
+        const colonIdx = line.indexOf(":");
+        if (colonIdx !== -1) {
+          const addrStr = line.slice(0, colonIdx).trim();
+          addr = parseIntOrNull(addrStr);
+          rest = line.slice(colonIdx + 1).trim();
+        }
+        if (addr === null || !rest) continue;
+
+        const parts = rest.split(/\s+/);
+        const op = parts[0].toUpperCase();
+        const operandStr = rest.slice(op.length).trim();
+        const args = operandStr ? operandStr.split(",").map(s => s.trim()) : [];
+
+        program.push({
+          addr,
+          text: rest,
+          op,
+          args,
+        });
+      }
+
+      // sort by address
+      program.sort((a, b) => a.addr - b.addr);
+      return program;
+    }
+
+    function parseMemoryText(text) {
+      const lines = text.split("\n");
+      const mem = {};
+
+      for (let line of lines) {
+        if (!line.trim()) continue;
+        const idx = line.indexOf(":");
+        if (idx === -1) continue;
+
+        const addrStr = line.slice(0, idx).trim();
+        const addr = parseIntOrNull(addrStr);
+        if (addr === null) continue;
+
+        const content = line.slice(idx + 1).trim();
+        // try parse number
+        const num = parseInt(content, 10);
+        if (!Number.isNaN(num) && content.match(/^-?\d+$/)) {
+          mem[addr] = num;
+        } else {
+          // treat as raw string (instruction or other)
+          mem[addr] = content;
+        }
+      }
+
+      return mem;
+    }
+
+    function initFromInputs() {
+      const program = parseProgramText(programInput.value);
+      const memory  = parseMemoryText(memoryInput.value);
+
+      state.program = program;
+      state.memory = memory;
+      state.registers.R1 = 0;
+      state.registers.R2 = 0;
+      state.registers.R3 = 0;
+      state.registers.IR = "";
+      state.lastALU = "";
+      state.phase = "fetch";
+      state.halted = false;
+
+      if (program.length > 0) {
+        state.registers.PC = program[0].addr;
+      } else {
+        state.registers.PC = null;
+        state.halted = true;
+      }
+
+      pcStartLabel.textContent = state.registers.PC !== null ? state.registers.PC : "–";
+
+      updateViews("CPU reset from editors.");
+    }
+
+    function resetCPUOnly() {
+      // re-init PC, registers, but keep parsed program & memory
+      if (state.program.length > 0) {
+        state.registers.PC = state.program[0].addr;
+      } else {
+        state.registers.PC = null;
+        state.halted = true;
+      }
+      state.registers.R1 = 0;
+      state.registers.R2 = 0;
+      state.registers.R3 = 0;
+      state.registers.IR = "";
+      state.lastALU = "";
+      state.phase = "fetch";
+      state.halted = false;
+      updateViews("CPU state reset (program & memory unchanged).");
+    }
+
+    function findInstructionAt(addr) {
+      return state.program.find(inst => inst.addr === addr) || null;
+    }
+
+    function readMemory(addr) {
+      return state.memory[addr] ?? 0;
+    }
+
+    function writeMemory(addr, value) {
+      state.memory[addr] = value;
+    }
+
+    function setPhaseChipActive(phase) {
+      phaseChips.forEach(ch => {
+        const p = ch.getAttribute("data-phase-chip");
+        ch.classList.toggle("active", p === phase);
+      });
+    }
+
+    function updateTables() {
+      // program table
+      programTableBody.innerHTML = "";
+      for (const inst of state.program) {
+        const tr = document.createElement("tr");
+        if (state.registers.PC === inst.addr) {
+          tr.classList.add("highlight");
+        }
+        const tdA = document.createElement("td");
+        tdA.textContent = inst.addr;
+        const tdI = document.createElement("td");
+        tdI.textContent = inst.text;
+        tr.appendChild(tdA);
+        tr.appendChild(tdI);
+        programTableBody.appendChild(tr);
+      }
+
+      // memory table: combine keys
+      const allAddrs = new Set([...Object.keys(state.memory).map(Number)]);
+      state.program.forEach(inst => allAddrs.add(inst.addr));
+      const sortedAddrs = Array.from(allAddrs).sort((a, b) => a - b);
+
+      memoryTableBody.innerHTML = "";
+      for (const addr of sortedAddrs) {
+        const tr = document.createElement("tr");
+        if (state.registers.PC === addr) {
+          tr.classList.add("highlight");
+        }
+        const tdA = document.createElement("td");
+        tdA.textContent = addr;
+        const tdV = document.createElement("td");
+
+        if (state.memory.hasOwnProperty(addr)) {
+          tdV.textContent = state.memory[addr];
+        } else {
+          const inst = findInstructionAt(addr);
+          tdV.textContent = inst ? inst.text : "";
+        }
+
+        tr.appendChild(tdA);
+        tr.appendChild(tdV);
+        memoryTableBody.appendChild(tr);
+      }
+    }
+
+    function updateRegistersView() {
+      pcVal.textContent  = state.registers.PC !== null ? state.registers.PC : "–";
+      irVal.textContent  = state.registers.IR || "–";
+      r1Val.textContent  = state.registers.R1;
+      r2Val.textContent  = state.registers.R2;
+      r3Val.textContent  = state.registers.R3;
+      aluVal.textContent = state.lastALU || "–";
+      phaseVal.textContent = state.phase;
+      setPhaseChipActive(state.phase);
+    }
+
+    function updateViews(message) {
+      updateRegistersView();
+      updateTables();
+      statusVal.textContent = state.halted ? "HALTED" : "Running";
+      if (message) {
+        explanationBox.textContent = message;
+      }
+      // enable/disable buttons
+      const disabled = state.halted || state.registers.PC === null;
+      stepPhaseBtn.disabled = disabled;
+      stepInstructionBtn.disabled = disabled;
+      runBtn.disabled = disabled;
+    }
+
+    // --- Execution Phases ---
+    function doFetch() {
+      if (state.registers.PC === null) {
+        state.halted = true;
+        updateViews("PC is null; nothing to fetch. CPU halted.");
+        return;
+      }
+      const inst = findInstructionAt(state.registers.PC);
+      if (!inst) {
+        state.halted = true;
+        updateViews(`No instruction at address ${state.registers.PC}. CPU halted.`);
+        return;
+      }
+      state.registers.IR = inst.op + " " + inst.args.join(", ");
+      state.phase = "decode";
+      const msg =
+        `FETCH phase:\n` +
+        `PC = ${state.registers.PC}\n` +
+        `Loaded instruction into IR: ${state.registers.IR}`;
+      updateViews(msg);
+    }
+
+    function doDecode() {
+      const ir = state.registers.IR;
+      if (!ir) {
+        state.halted = true;
+        updateViews("IR is empty; nothing to decode. CPU halted.");
+        return;
+      }
+      state.phase = "execute";
+      const msg =
+        `DECODE phase:\n` +
+        `Instruction in IR: ${ir}\n` +
+        `CPU identifies opcode and operand fields.`;
+      updateViews(msg);
+    }
+
+    function doExecute() {
+      const pcBefore = state.registers.PC;
+      const inst = findInstructionAt(pcBefore);
+      if (!inst) {
+        state.halted = true;
+        updateViews(`No instruction at address ${pcBefore} during EXECUTE. CPU halted.`);
+        return;
+      }
+
+      let explanation = `EXECUTE phase:\nInstruction: ${inst.op} ${inst.args.join(", ")}\n`;
+      let pcNext = pcBefore + 1;
+      let branchTaken = false;
+
+      const regs = state.registers;
+
+      function getReg(name) {
+        const up = name.toUpperCase();
+        if (!["R1","R2","R3"].includes(up)) {
+          throw new Error("Unknown register " + name);
+        }
+        return regs[up];
+      }
+      function setReg(name, value) {
+        const up = name.toUpperCase();
+        if (!["R1","R2","R3"].includes(up)) {
+          throw new Error("Unknown register " + name);
+        }
+        regs[up] = value;
+      }
+
+      try {
+        switch (inst.op) {
+          case "LOAD": {
+            // LOAD R1, 500  or LOAD R1, #5
+            const [dst, src] = inst.args;
+            if (!dst || !src) throw new Error("LOAD needs dst, src");
+            if (src.startsWith("#")) {
+              const imm = parseInt(src.slice(1), 10);
+              setReg(dst, imm);
+              explanation += `Immediate load: ${dst} ← ${imm}`;
+            } else {
+              const addr = parseInt(src, 10);
+              const val = readMemory(addr);
+              setReg(dst, val);
+              explanation += `Memory load: ${dst} ← Memory[${addr}] = ${val}`;
+            }
+            state.lastALU = "";
+            break;
+          }
+          case "ADD": {
+            // ADD R3, R1, R2
+            const [dst, a, b] = inst.args;
+            if (!dst || !a || !b) throw new Error("ADD needs dst, src1, src2");
+            const va = getReg(a);
+            const vb = getReg(b);
+            const res = va + vb;
+            setReg(dst, res);
+            state.lastALU = `${dst} = ${a}(${va}) + ${b}(${vb}) = ${res}`;
+            explanation += `ALU addition: ${state.lastALU}`;
+            break;
+          }
+          case "STORE": {
+            // STORE R1, 700
+            const [src, addrStr] = inst.args;
+            if (!src || !addrStr) throw new Error("STORE needs src, addr");
+            const addr = parseInt(addrStr, 10);
+            const val = getReg(src);
+            writeMemory(addr, val);
+            explanation += `STORE: Memory[${addr}] ← ${src} = ${val}`;
+            state.lastALU = "";
+            break;
+          }
+          case "JUMP": {
+            // JUMP 204
+            const [addrStr] = inst.args;
+            const addr = parseInt(addrStr, 10);
+            pcNext = addr;
+            branchTaken = true;
+            explanation += `JUMP: PC ← ${addr}`;
+            state.lastALU = "";
+            break;
+          }
+          default: {
+            explanation += `Unknown opcode ${inst.op}. CPU halts.`;
+            state.halted = true;
+          }
+        }
+      } catch (err) {
+        explanation += `\nError: ${err.message}\nExecution halted.`;
+        state.halted = true;
+      }
+
+      if (!state.halted) {
+        regs.PC = pcNext;
+        state.phase = "fetch";
+        explanation += `\n\nPC update: PC was ${pcBefore}, now ${regs.PC}` +
+                       (branchTaken ? " (branch taken)." : ".");
+      }
+      updateViews(explanation);
+    }
+
+    // Step a single phase
+    function stepPhase() {
+      if (state.halted) {
+        updateViews("CPU is halted.");
+        return;
+      }
+      if (state.phase === "fetch") {
+        doFetch();
+      } else if (state.phase === "decode") {
+        doDecode();
+      } else {
+        doExecute();
+      }
+    }
+
+    // Step full instruction: F → D → E sequence
+    function stepInstruction() {
+      if (state.halted) {
+        updateViews("CPU is halted.");
+        return;
+      }
+      const startPhase = state.phase;
+      if (startPhase !== "fetch") {
+        // align to fetch for clarity
+        state.phase = "fetch";
+      }
+      doFetch();
+      if (state.halted) return;
+      doDecode();
+      if (state.halted) return;
+      doExecute();
+    }
+
+    // Run until no more instructions or safety limit
+    function runUntilEnd() {
+      let safety = 500;
+      while (!state.halted && safety-- > 0) {
+        stepInstruction();
+      }
+      if (safety <= 0) {
+        state.halted = true;
+        updateViews("Execution stopped: safety limit reached (possible infinite loop).");
+      }
+    }
+
+    // --- Event wiring ---
+    applyConfigBtn.addEventListener("click", () => {
+      initFromInputs();
+    });
+
+    resetBtn.addEventListener("click", () => {
+      resetCPUOnly();
+    });
+
+    stepPhaseBtn.addEventListener("click", () => {
+      stepPhase();
+    });
+
+    stepInstructionBtn.addEventListener("click", () => {
+      stepInstruction();
+    });
+
+    runBtn.addEventListener("click", () => {
+      runUntilEnd();
+    });
+
+    // Initial setup
+    initFromInputs();
+  </script>
+</body>
+</html>
