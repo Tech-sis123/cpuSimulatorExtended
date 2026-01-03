@@ -1,0 +1,8 @@
+This report documents the comprehensive modification and enhancement of a web-based Central Processing Unit (CPU) simulator.
+The project aimed to extend a basic instruction set architecture (ISA) to include advanced arithmetic and logical operations, 
+complex addressing modes, and flow control mechanisms. 
+Specifically, the implementation of SUB, MUL, DIV, AND, OR, and NOT instructions, 
+alongside Immediate, Register-Indirect, and Indexed addressing modes, significantly broadens the computational capabilities of the simulator. 
+Furthermore, the introduction of a Zero Flag (ZF) and a conditional jump instruction (JNZ) enables the execution of iterative algorithms. 
+An optional system bus visualization was also integrated to provide a real-time graphical representation of the Fetch-Decode-Execute cycle. 
+This report details the system architecture, software design patterns, implementation logic, verification methodologies, and a critical evaluation of the final deliverable.
